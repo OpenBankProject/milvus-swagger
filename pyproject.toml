@@ -1,0 +1,26 @@
+[project]
+name = "milvus-swagger"
+version = "0.1.0"
+description = "Ingestion of Swagger 2.0 files into a Milvus vector DB for RAG applications."
+authors = [
+    {name = "Nemo Godebski-Pedersen",email = "nemozak1@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "langchain-ollama (>=0.3.2,<0.4.0)",
+    "langchain-milvus (>=0.1.9,<0.2.0)",
+    "pymilvus (==2.5.6)",
+    "openapi-spec-validator (>=0.7.1,<0.8.0)",
+    "prance[cli,icu,osv] (>=25.4.8.0,<26.0.0.0)",
+    "langchain-openai (>=0.3.14,<0.4.0)",
+    "typer (>=0.15.2,<0.16.0)",
+    "markdownify (>=1.1.0,<2.0.0)"
+]
+
+[tool.poetry.scripts]
+milvus-swagger = "milvus_swagger.main:app"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
