@@ -1,5 +1,7 @@
 import os
 import requests
+import json
+
 from openapi_spec_validator import OpenAPIV2SpecValidator, validate
 from prance import ResolvingParser
 
@@ -81,3 +83,118 @@ def resolve_swagger(url: str):
     else:
         print("Swagger is not valid, cannot resolve.")
         return None
+    
+
+def cache_swagger(swagger_spec_dict: dict, cache_dir: str = ".cache/"):
+    """
+    This function caches a Swagger specification to a local file.
+
+    Parameters:
+        swagger_dict (dict): The Swagger specification to cache.
+        cache_dir (str): The directory where the cached file will be saved.
+
+    Returns:
+        str: The path to the cached file.
+    """
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+
+    cache_file = os.path.join(cache_dir, "swagger_cache.json")
+    
+    with open(cache_file, 'w') as f:
+        json.dump(swagger_spec_dict, f)
+
+    return cache_file
+
+
+def check_against_cache(swagger_spec_dict: dict, cached_spec_path: str):
+    """
+    This function checks if a cached Swagger specification matches the given one.
+
+    Parameters:
+        swagger_dict (dict): The Swagger specification to check.
+        cached_spec_path (str): The path to the cached Swagger specification.
+
+    Returns:
+        bool: True if the cached specification matches the given one, False otherwise.
+    """
+    if not os.path.exists(cached_spec_path):
+        raise ValueError(f"Cached spec file not found at {cached_spec_path}")
+
+    with open(cached_spec_path, 'r') as f:
+        cached_spec = json.load(f)
+
+    return swagger_spec_dict == cached_spec
+
+
+def get_updated_operationIDs_from_cache(swagger_spec_dict: dict, cached_spec_path: str):
+    """
+    This function compares a Swagger specification with a cached version and returns the operation IDs that need to be updated.
+    It checks each path and method in the Swagger specification against the cached specification,
+
+    Parameters:
+        swagger_dict (dict): The Swagger specification to compare.
+        cached_spec_path (str): The path to the cached Swagger specification.
+
+    Returns:
+        List[str]: A list of updated operation IDs.
+    """
+    if not os.path.exists(cached_spec_path):
+        raise ValueError(f"Cached spec file not found at {cached_spec_path}")
+
+    with open(cached_spec_path, 'r') as f:
+        cached_spec = json.load(f)
+
+    updated_operationIDs = []
+    for path, methods in swagger_spec_dict["paths"].items():
+
+        # If path does not exist, all methods are new
+        if path not in cached_spec["paths"]:
+            for method, properties in methods.items():
+                operationID = properties.get("operationId")
+                if operationID:
+                    updated_operationIDs.append(operationID)
+
+        else:
+            # If path exists, check each method
+            for method, properties in methods.items():
+                operationID = properties.get("operationId")
+                # If method does not exist, it's a new method
+                if method not in cached_spec["paths"][path]:
+                    if operationID:
+                        updated_operationIDs.append(operationID)
+                    continue
+
+                if properties != cached_spec["paths"][path][method]:
+                    # If properties are different, check operationId
+                    if operationID and operationID not in updated_operationIDs:
+                        updated_operationIDs.append(operationID)
+
+    print("Updated operation IDs after checking incoming spec:", updated_operationIDs)
+
+    # Check for removed operation IDs
+    for path, methods in cached_spec["paths"].items():
+        # If path does not exist, all methods are removed
+        if path not in swagger_spec_dict["paths"]:
+            for method, properties in methods.items():
+                operationID = properties.get("operationId")
+                if operationID and operationID not in updated_operationIDs:
+                    updated_operationIDs.append(operationID)
+        else:
+            # If path exists, check each method
+            for method, properties in methods.items():
+                operationID = properties.get("operationId")
+                # If method does not exist, it's a removed method
+                if method not in swagger_spec_dict["paths"][path]:
+                    if operationID and operationID not in updated_operationIDs:
+                        updated_operationIDs.append(operationID)
+                else:
+                    # If properties are different, check operationId
+                    if properties != swagger_spec_dict["paths"][path][method]:
+                        if operationID and operationID not in updated_operationIDs:
+                            updated_operationIDs.append(operationID)
+                    
+
+    print("Updated operation IDs after checking deletions:", updated_operationIDs)
+
+    return updated_operationIDs
